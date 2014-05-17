@@ -80,7 +80,7 @@ class NettyServer(serverConfig: ServerConfig, dispatcher: Dispatcher) extends Se
 
             val requestHeader = RequestHeader(path = AbsPath.decode(req.getUri))
 
-            dispatcher.dispatch(requestHeader).onComplete { trh: Try[RequestHandler] =>
+            Future(dispatcher.dispatch(requestHeader)).onComplete { trh: Try[RequestHandler] =>
               val handler: StatusAndBody = trh match {
                 case Success(s: StatusAndBody) => s
                 case other => StatusAndBody(INTERNAL_SERVER_ERROR.code, "Error")

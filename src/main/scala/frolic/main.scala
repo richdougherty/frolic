@@ -8,8 +8,8 @@ import frolic.dispatch.Dispatcher
 object Main {
   def main(args: Array[String]): Unit = {
     val dispatcher = new Dispatcher {
-      def dispatch(requestHeader: RequestHeader): Future[RequestHandler] = {
-        Future.successful(StatusAndBody(200, "Hello world!"))
+      def dispatch(requestHeader: RequestHeader): RequestHandler = {
+        StatusAndBody(200, "Hello world!")
       }
     }
     val serverConfig = ServerConfig(port = 9000)
