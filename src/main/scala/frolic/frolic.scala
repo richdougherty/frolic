@@ -4,15 +4,7 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import frolic.uri.AbsPath
 
-trait RequestDispatcher {
-  def dispatch(requestHeader: RequestHeader): Future[RequestHandler]
-}
 
-class EmptyRequestDispatcher extends RequestDispatcher {
-  override def dispatch(requestHeader: RequestHeader): Future[RequestHandler] = {
-    Future.successful(StatusAndBody(404, "Resource not found"))
-  }
-}
 
 final case class RequestHeader(path: AbsPath)
 

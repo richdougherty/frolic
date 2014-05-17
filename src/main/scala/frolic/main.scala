@@ -3,10 +3,11 @@ package frolic
 import frolic.server.ServerConfig
 import frolic.server.netty.NettyServer
 import scala.concurrent.Future
+import frolic.dispatch.Dispatcher
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val dispatcher = new RequestDispatcher {
+    val dispatcher = new Dispatcher {
       def dispatch(requestHeader: RequestHeader): Future[RequestHandler] = {
         Future.successful(StatusAndBody(200, "Hello world!"))
       }

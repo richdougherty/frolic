@@ -2,7 +2,6 @@ package example
 
 import frolic._
 import frolic.route.Router
-import frolic.route.Target
 import java.lang.reflect.Method
 import frolic.uri.AbsPathAndQuery
 import frolic.uri.AbsPath
@@ -10,17 +9,16 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import sun.net.httpserver.ServerConfig
 import frolic.server.netty.NettyServer
-import frolic.route.RoutingDispatcher
 import frolic.server.ServerConfig
+import frolic.dispatch.EmptyDispatcher
+import frolic.dispatch.FallbackDispatcher
 
 class MyController {
   def index = "hello"
 }
 
-class MyControllerTargets(myController: MyController) {
-  def index = new Target {
-    override def call(rh: RequestHeader) = Future { StatusAndBody(200, myController.index) }
-  }
+class MyControllerHandlers(myController: MyController) {
+  def index = Future { StatusAndBody(200, myController.index) }
 }
 
 class MyControllerReverse(router: Router) {
@@ -28,9 +26,9 @@ class MyControllerReverse(router: Router) {
   def index = router.reverse(indexMethod, Seq.empty)
 }
 
-class MyRouter(myControllerTargets: MyControllerTargets) extends Router {
-  def lookup(requestHeader: RequestHeader): Option[Target] = requestHeader.path match {
-    case AbsPath(Seq()) => Some(myControllerTargets.index)
+class MyRouter(myControllerHandlers: MyControllerHandlers) extends Router {
+  def dispatch(requestHeader: RequestHeader): Option[Future[RequestHandler]] = requestHeader.path match {
+    case AbsPath(Seq()) => Some(myControllerHandlers.index)
     case _ => None
   }
 
@@ -45,11 +43,11 @@ class MyRouter(myControllerTargets: MyControllerTargets) extends Router {
 object MyMain {
   def main(args: Array[String]): Unit = {
     val myController = new MyController
-    val myControllerTargets = new MyControllerTargets(myController)
-    val router = new MyRouter(myControllerTargets)
+    val myControllerHandlers = new MyControllerHandlers(myController)
+    val router = new MyRouter(myControllerHandlers)
     //val myControllerReverse = new MyControllerReverse(router)
-    val emptyDispatcher = new EmptyRequestDispatcher
-    val dispatcher = new RoutingDispatcher(router, fallback = emptyDispatcher)
+    val emptyDispatcher = new EmptyDispatcher
+    val dispatcher = new FallbackDispatcher(router, emptyDispatcher)
     val serverConfig = ServerConfig(port = 9000)
         val server = new NettyServer(serverConfig, dispatcher)
     server.start()

@@ -6,8 +6,9 @@ import scala.concurrent.{ Future, Promise }
 import scala.util.{ Failure, Success, Try }
 import frolic.RequestHeader
 import frolic.uri.AbsPath
+import frolic.dispatch.Dispatcher
 
-class NettyServer(serverConfig: ServerConfig, dispatcher: RequestDispatcher) extends Server {
+class NettyServer(serverConfig: ServerConfig, dispatcher: Dispatcher) extends Server {
 
   import io.netty.bootstrap.ServerBootstrap
   import io.netty.buffer.Unpooled

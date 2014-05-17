@@ -5,31 +5,13 @@ import java.lang.reflect.Method
 import scala.collection.immutable
 import frolic.RequestHeader
 import frolic.RequestHandler
-import frolic.RequestDispatcher
+import frolic.dispatch.Dispatcher
 import scala.concurrent.Future
+import frolic.dispatch.PartialDispatcher
 
-class RoutingDispatcher(router: Router, fallback: RequestDispatcher) extends RequestDispatcher {
-  override def dispatch(requestHeader: RequestHeader): Future[RequestHandler] = {
-    println(requestHeader)
-    router.lookup(requestHeader).map { target =>
-      println("calling target")
-      target.call(requestHeader)
-    } getOrElse {
-      println("calling fallback")
-      fallback.dispatch(requestHeader)
-    }
-  }
-}
-
-trait Router {
-  def lookup(requestHeader: RequestHeader): Option[Target]
+trait Router extends PartialDispatcher {
   def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery]
 }
-
-trait Target {
-  def call(requestHeader: RequestHeader): Future[RequestHandler]
-}
-
 
 //trait SimpleRouter {
 //  final override def route(requestHeader: RequestHeader): Option[RequestHandler] = {
