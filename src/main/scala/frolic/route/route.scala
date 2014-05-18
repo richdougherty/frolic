@@ -13,20 +13,18 @@ trait Router extends PartialDispatcher {
   def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery]
 }
 
-//trait SimpleRouter {
-//  final override def route(requestHeader: RequestHeader): Option[RequestHandler] = {
-//    
-//  }
-//  def route(method: String, path: AbsPathAndQuery): Option[AbsPathAndQuery]
-//  def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery]
-//}
-
-//
-//final case class FixedPattern(method: String, path: Vector[String]) extends Route
-//
-//trait Route {
-//  def apply()
-//}
-//
-//trait ReverseRoute {
-//}
+// Proof of concept for wrapping an existing Router and prefixing it with some path segments
+final class PrefixRouter(prefix: immutable.Seq[PathSegment], delegate: Router) extends Router {
+  assert(!prefix.isEmpty)
+  private def prefixPath(p: AbsPath) = AbsPath(prefix ++ p.segments)
+  override def dispatch(rh: RequestHeader): Option[RequestHandler] = {
+    val newPath = prefixPath(rh.path)
+    delegate.dispatch(RequestHeader(newPath))
+  }
+  override def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery] = {
+    delegate.reverse(m, args).map { orig: AbsPathAndQuery =>
+      val newPath = prefixPath(orig.p)
+      AbsPathAndQuery(newPath, orig.q)
+    }
+  }
+}
