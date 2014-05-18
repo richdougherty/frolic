@@ -27,6 +27,9 @@ import frolic.inject.CachingAndClosingScope
 import com.google.inject.name.Names
 import com.google.inject.Key
 import frolic.inject.AppScope
+import com.google.inject.Module
+import scala.collection.immutable
+import com.google.inject.Injector
 
 @AppScoped
 class MyController {
@@ -58,17 +61,20 @@ class MyRouter @Inject() (myControllerHandlers: MyControllerHandlers) extends Ro
   }
 }
 
+class AppScopeModule extends AbstractModule {
+  val appScope = new AppScope()
+  
+  override def configure = {
+    bindScope(classOf[AppScoped], appScope)
+    bind(classOf[AppScope]).toInstance(appScope)
+  }
+  
+  def close() = appScope.close()  
+}
+
 class MyModule extends AbstractModule {
 
   override def configure = {
-    {
-      val appScope = new AppScope()
-      bindScope(classOf[AppScoped], appScope)
-      bind(classOf[AppScope]).toInstance(appScope)
-    }
-
-    bind(classOf[ServerConfig]).toInstance(ServerConfig(port = 9000))
-    bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
     bind(classOf[Router]).to(classOf[MyRouter]).in(classOf[Singleton])
   }
   
@@ -79,20 +85,35 @@ class MyModule extends AbstractModule {
   }
 }
 
-class DevServerModule extends AbstractModule {
-  override def configure = {
-    bind(classOf[ServerConfig]).toInstance(ServerConfig(port=9000))
-    bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
-    bind(classOf[Router]).to(classOf[MyRouter]).in(classOf[Singleton])
-  }
+class DevDispatcher @Inject() (injector: Injector, appModules: AppModules) extends Dispatcher {
+  val appScopeModule = new AppScopeModule
+  val appInjector = injector.createChildInjector((appScopeModule +: appModules.modules): _*)
+  val appScope = appScopeModule.appScope
+  val appDispatcher = appInjector.getInstance(Key.get(classOf[Dispatcher]))
+
+  def dispatch(requestHeader: RequestHeader): RequestHandler = appDispatcher.dispatch(requestHeader)
 }
+
+final case class AppModules(modules: immutable.Seq[Module])
 
 object MyMain {
   def main(args: Array[String]): Unit = {
-    val injector = Guice.createInjector(new DevServerModule, new MyModule)
-    val server = injector.getInstance(classOf[Server])
-    val appScope = injector.getInstance(classOf[AppScope])
+    val appModules = AppModules(List(new MyModule))
+    val rootInjector = Guice.createInjector(new AbstractModule {
+      override def configure = {
+        // nothing shared yet, but will have Akka, threads, etc at some point
+      }
+    })
+    val devDispatcher = new DevDispatcher(rootInjector, appModules)
+    val serverInjector = rootInjector.createChildInjector(new AbstractModule {
+      override def configure() = {
+        bind(classOf[ServerConfig]).toInstance(ServerConfig(port=9000))
+        bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
+        bind(classOf[Dispatcher]).toInstance(devDispatcher)
+      }
+    })
+    val server = serverInjector.getInstance(classOf[Server])
     server.start()
-    appScope.close() // Probably not called, but at least it compiles!
+    // TODO: stop server and dev mode
   }
 }
