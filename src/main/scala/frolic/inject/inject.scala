@@ -15,6 +15,8 @@ final class ProviderCell[T] extends Provider[T] {
   def get(): T = value.getOrElse(throw new IllegalStateException("ProviderCell doesn't have a value"))
 }
 
+class AppScope extends CachingAndClosingScope
+
 class CachingAndClosingScope extends Scope {
   scope =>
 

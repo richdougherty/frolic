@@ -26,6 +26,7 @@ import frolic.inject.AppScoped
 import frolic.inject.CachingAndClosingScope
 import com.google.inject.name.Names
 import com.google.inject.Key
+import frolic.inject.AppScope
 
 @AppScoped
 class MyController {
@@ -61,9 +62,9 @@ class MyModule extends AbstractModule {
 
   override def configure = {
     {
-      val appScope = new CachingAndClosingScope()
+      val appScope = new AppScope()
       bindScope(classOf[AppScoped], appScope)
-      bind(classOf[CachingAndClosingScope]).annotatedWith(Names.named("appScope")).toInstance(appScope)
+      bind(classOf[AppScope]).toInstance(appScope)
     }
 
     bind(classOf[ServerConfig]).toInstance(ServerConfig(port = 9000))
@@ -78,11 +79,19 @@ class MyModule extends AbstractModule {
   }
 }
 
+class DevServerModule extends AbstractModule {
+  override def configure = {
+    bind(classOf[ServerConfig]).toInstance(ServerConfig(port=9000))
+    bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
+    bind(classOf[Router]).to(classOf[MyRouter]).in(classOf[Singleton])
+  }
+}
+
 object MyMain {
   def main(args: Array[String]): Unit = {
-    val injector = Guice.createInjector(new MyModule)
+    val injector = Guice.createInjector(new DevServerModule, new MyModule)
     val server = injector.getInstance(classOf[Server])
-    val appScope = injector.getInstance(Key.get(classOf[CachingAndClosingScope], Names.named("appScope")))
+    val appScope = injector.getInstance(classOf[AppScope])
     server.start()
     appScope.close() // Probably not called, but at least it compiles!
   }
