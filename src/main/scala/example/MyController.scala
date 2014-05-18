@@ -15,21 +15,28 @@ import frolic.inject.ProviderCell
 import frolic.StatusAndBody
 import frolic.RequestHeader
 import frolic.RequestHandler
+import com.google.inject.AbstractModule
+import com.google.inject.Provides
+import frolic.dispatch.Dispatcher
+import frolic.server.Server
+import com.google.inject.Singleton
+import com.google.inject.Guice
+import javax.inject.Inject
 
 class MyController {
   def index = "hello"
 }
 
-class MyControllerHandlers(myController: MyController) {
+class MyControllerHandlers @Inject() (myController: MyController) {
   def index = StatusAndBody(200, myController.index)
 }
 
-class MyControllerReverse(router: Provider[Router]) {
+class MyControllerReverse @Inject() (router: Provider[Router]) {
   private val indexMethod = classOf[MyController].getMethod("index")
   def index = router.get.reverse(indexMethod, Seq.empty)
 }
 
-class MyRouter(myControllerHandlers: MyControllerHandlers) extends Router {
+class MyRouter @Inject() (myControllerHandlers: MyControllerHandlers) extends Router {
   def dispatch(requestHeader: RequestHeader): Option[RequestHandler] = requestHeader.path match {
     case AbsPath(Seq()) => Some(myControllerHandlers.index)
     case _ => None
@@ -42,18 +49,25 @@ class MyRouter(myControllerHandlers: MyControllerHandlers) extends Router {
   }
 }
 
+class MyModule extends AbstractModule {
+
+  override def configure = {
+    bind(classOf[ServerConfig]).toInstance(ServerConfig(port = 9000))
+    bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
+    bind(classOf[Router]).to(classOf[MyRouter]).in(classOf[Singleton])
+  }
+  
+  @Provides
+  def dispatcher(router: Router): Dispatcher = {
+    val emptyDispatcher = new EmptyDispatcher
+    new FallbackDispatcher(router, emptyDispatcher)
+  }
+}
+
 object MyMain {
   def main(args: Array[String]): Unit = {
-    val routerProvider = new ProviderCell[Router]
-    val myController = new MyController
-    val myControllerHandlers = new MyControllerHandlers(myController)
-    val router = new MyRouter(myControllerHandlers)
-    routerProvider.set(router)
-    val myControllerReverse = new MyControllerReverse(routerProvider)
-    val emptyDispatcher = new EmptyDispatcher
-    val dispatcher = new FallbackDispatcher(router, emptyDispatcher)
-    val serverConfig = ServerConfig(port = 9000)
-    val server = new NettyServer(serverConfig, dispatcher)
+    val injector = Guice.createInjector(new MyModule)
+    val server = injector.getInstance(classOf[Server])
     server.start()
   }
 }

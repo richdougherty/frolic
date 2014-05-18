@@ -7,8 +7,9 @@ import scala.util.{ Failure, Success, Try }
 import frolic.RequestHeader
 import frolic.uri.AbsPath
 import frolic.dispatch.Dispatcher
+import javax.inject.Inject
 
-class NettyServer(serverConfig: ServerConfig, dispatcher: Dispatcher) extends Server {
+class NettyServer @Inject() (serverConfig: ServerConfig, dispatcher: Dispatcher) extends Server {
 
   import io.netty.bootstrap.ServerBootstrap
   import io.netty.buffer.Unpooled
