@@ -79,7 +79,7 @@ class MyModule extends AbstractModule {
   }
   
   @Provides @AppScoped
-  def dispatcher(router: Router): Dispatcher = {
+  def requestHandler(router: Router): RequestHandler = {
     val emptyDispatcher = new EmptyDispatcher
     new FallbackDispatcher(router, emptyDispatcher)
   }
@@ -89,9 +89,10 @@ class DevDispatcher @Inject() (injector: Injector, appModules: AppModules) exten
   val appScopeModule = new AppScopeModule
   val appInjector = injector.createChildInjector((appScopeModule +: appModules.modules): _*)
   val appScope = appScopeModule.appScope
-  val appDispatcher = appInjector.getInstance(Key.get(classOf[Dispatcher]))
+  val appRequestHandler = appInjector.getInstance(Key.get(classOf[RequestHandler]))
 
-  def dispatch(requestHeader: RequestHeader): RequestHandler = appDispatcher.dispatch(requestHeader)
+  // Ignores header and always returns the same handler
+  def dispatch(requestHeader: RequestHeader): RequestHandler = appRequestHandler
 }
 
 final case class AppModules(modules: immutable.Seq[Module])
@@ -109,7 +110,7 @@ object MyMain {
       override def configure() = {
         bind(classOf[ServerConfig]).toInstance(ServerConfig(port=9000))
         bind(classOf[Server]).to(classOf[NettyServer]).in(classOf[Singleton])
-        bind(classOf[Dispatcher]).toInstance(devDispatcher)
+        bind(classOf[RequestHandler]).toInstance(devDispatcher)
       }
     })
     val server = serverInjector.getInstance(classOf[Server])

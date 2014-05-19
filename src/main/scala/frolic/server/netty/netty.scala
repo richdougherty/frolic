@@ -8,8 +8,10 @@ import frolic.RequestHeader
 import frolic.uri.AbsPath
 import frolic.dispatch.Dispatcher
 import javax.inject.Inject
+import scala.annotation.tailrec
+import scala.util.control.NonFatal
 
-class NettyServer @Inject() (serverConfig: ServerConfig, dispatcher: Dispatcher) extends Server {
+class NettyServer @Inject() (serverConfig: ServerConfig, rootHandler: RequestHandler) extends Server {
 
   import io.netty.bootstrap.ServerBootstrap
   import io.netty.buffer.Unpooled
@@ -81,25 +83,33 @@ class NettyServer @Inject() (serverConfig: ServerConfig, dispatcher: Dispatcher)
 
             val requestHeader = RequestHeader(path = AbsPath.decode(req.getUri))
 
-            Future(dispatcher.dispatch(requestHeader)).onComplete { trh: Try[RequestHandler] =>
-              val handler: StatusAndBody = trh match {
-                case Success(s: StatusAndBody) => s
-                case other => StatusAndBody(INTERNAL_SERVER_ERROR.code, "Error")
-              }
-              println(s"Handler: $handler")
-              val status = OK
-              val content = Unpooled.copiedBuffer(handler.body, CharsetUtil.UTF_8)
-              val response = new DefaultFullHttpResponse(HTTP_1_1, status, content)
-              response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
-              response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
-              if (!keepAlive) {
-                ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
-              } else {
-                response.headers().set(CONNECTION, Values.KEEP_ALIVE);
-                ctx.writeAndFlush(response);
-              }
+            @tailrec
+            def handleWith(handler: RequestHandler): Unit = handler match {
+              case dispatcher: Dispatcher =>
+                val newHandler = try dispatcher.dispatch(requestHeader) catch {
+                  case NonFatal(_) => StatusAndBody(INTERNAL_SERVER_ERROR.code, "Error")
+                }
+                handleWith(newHandler)
+              case StatusAndBody(statusCode, body) =>
+                val status = OK
+                val content = Unpooled.copiedBuffer(body, CharsetUtil.UTF_8)
+                val response = new DefaultFullHttpResponse(HTTP_1_1, status, content)
+                response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
+                response.headers().set(CONTENT_LENGTH, response.content().readableBytes());
+                if (!keepAlive) {
+                  ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+                } else {
+                  response.headers().set(CONNECTION, Values.KEEP_ALIVE);
+                  ctx.writeAndFlush(response);
+                }
+              case unknownHandler =>
+                val newHandler = StatusAndBody(INTERNAL_SERVER_ERROR.code, "Unknown handler")
+                handleWith(newHandler)
             }
+        
+            handleWith(rootHandler)
           case _ =>
+            // ignore
         }
       }
 

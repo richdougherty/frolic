@@ -5,7 +5,7 @@ import scala.concurrent.Future
 import frolic.RequestHandler
 import frolic.StatusAndBody
 
-trait Dispatcher {
+trait Dispatcher extends RequestHandler {
   def dispatch(requestHeader: RequestHeader): RequestHandler
 }
 
