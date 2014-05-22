@@ -20,7 +20,8 @@ class AppScope extends CachingAndClosingScope
 class CachingAndClosingScope extends Scope {
   scope =>
 
-  var objectsToClose: Seq[AutoCloseable] = Vector.empty
+  // object to close, stored in a reverse stack so it can be processed in lifo order
+  var objectsToClose: List[AutoCloseable] = Nil
   
   override def scope[T](key: Key[T], unscoped: Provider[T]): Provider[T] = {
     new Provider[T] {
@@ -31,7 +32,7 @@ class CachingAndClosingScope extends Scope {
             val value = unscoped.get()
             value match {
               case closeable: AutoCloseable =>
-                objectsToClose = objectsToClose :+ closeable
+                objectsToClose = closeable :: objectsToClose
               case _ =>
             }            
             current = Some(value)
