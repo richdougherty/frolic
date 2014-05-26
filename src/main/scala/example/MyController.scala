@@ -30,36 +30,43 @@ import frolic.inject.AppScope
 import com.google.inject.Module
 import scala.collection.immutable
 import com.google.inject.Injector
+import frolic.route.dsl.DslRouter
+import frolic.route.dsl.RouteRule
 
 @AppScoped
 class MyController {
   def index = "hello"
 }
 
-@AppScoped
-class MyControllerHandlers @Inject() (myController: MyController) {
-  def index = StatusAndBody(200, myController.index)
-}
+//@AppScoped
+//class MyControllerHandlers @Inject() (myController: MyController) {
+//  def index = StatusAndBody(200, myController.index)
+//}
+
+//@AppScoped
+//class MyControllerReverse @Inject() (router: Provider[Router]) {
+//  private val indexMethod = classOf[MyController].getMethod("index")
+//  def index = router.get.reverse(indexMethod, Seq.empty)
+//}
+//
+//@AppScoped
+//class MyRouter @Inject() (myControllerHandlers: MyControllerHandlers) extends Router {
+//  def dispatch(requestHeader: RequestHeader): Option[RequestHandler] = requestHeader.path match {
+//    case AbsPath(Seq()) => Some(myControllerHandlers.index)
+//    case _ => None
+//  }
+//
+//  private val indexMethod = classOf[MyController].getMethod("index")
+//  def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery] = m match {
+//    case `indexMethod` => Some(AbsPathAndQuery.decode("/"))
+//    case _ => None
+//  }
+//}
 
 @AppScoped
-class MyControllerReverse @Inject() (router: Provider[Router]) {
-  private val indexMethod = classOf[MyController].getMethod("index")
-  def index = router.get.reverse(indexMethod, Seq.empty)
-}
-
-@AppScoped
-class MyRouter @Inject() (myControllerHandlers: MyControllerHandlers) extends Router {
-  def dispatch(requestHeader: RequestHeader): Option[RequestHandler] = requestHeader.path match {
-    case AbsPath(Seq()) => Some(myControllerHandlers.index)
-    case _ => None
-  }
-
-  private val indexMethod = classOf[MyController].getMethod("index")
-  def reverse(m: Method, args: Seq[Any]): Option[AbsPathAndQuery] = m match {
-    case `indexMethod` => Some(AbsPathAndQuery.decode("/"))
-    case _ => None
-  }
-}
+class MyRouter @Inject() (injector: Injector, classLoader: ClassLoader) extends DslRouter(List(
+  RouteRule(AbsPath(Nil), classOf[MyController].getName, "index")
+), classLoader, injector)
 
 class AppScopeModule extends AbstractModule {
   val appScope = new AppScope()
@@ -69,13 +76,13 @@ class AppScopeModule extends AbstractModule {
     bind(classOf[AppScope]).toInstance(appScope)
   }
   
-  def close() = appScope.close()  
+  def close() = appScope.close()
 }
 
 class MyModule extends AbstractModule {
 
   override def configure = {
-    bind(classOf[Router]).to(classOf[MyRouter]).in(classOf[Singleton])
+    bind(classOf[Router]).to(classOf[MyRouter])
   }
   
   @Provides @AppScoped
@@ -102,7 +109,7 @@ object MyMain {
     val appModules = AppModules(List(new MyModule))
     val rootInjector = Guice.createInjector(new AbstractModule {
       override def configure = {
-        // nothing shared yet, but will have Akka, threads, etc at some point
+        bind(classOf[ClassLoader]).toInstance(getClass.getClassLoader)
       }
     })
     val devDispatcher = new DevDispatcher(rootInjector, appModules)
