@@ -1,9 +1,10 @@
-package frolic
+package demo.helloworld
 
+import frolic.{ StatusAndBody, RequestHandler, RequestHeader }
+import frolic.dispatch.Dispatcher
 import frolic.server.ServerConfig
 import frolic.server.netty.NettyServer
 import scala.concurrent.Future
-import frolic.dispatch.Dispatcher
 
 object Main {
   def main(args: Array[String]): Unit = {
